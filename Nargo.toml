@@ -1,0 +1,9 @@
+[package]
+name = "jwt_test"
+type = "bin"
+authors = [""]
+compiler_version = ">=0.36.0"
+
+[dependencies]
+# jwt = { git = "https://github.com/zkemail/noir-jwt", tag = "v0.2.0" }
+jwt = { path = "./noir-jwt" } 
