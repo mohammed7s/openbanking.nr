@@ -3,7 +3,6 @@ const fs = require('fs');
 const { Noir } = require('@noir-lang/noir_js');
 const circuit = require("../../target/jwt_test.json");
 const paymentPayload = require("./data.json");
-const privateKeyPEM = fs.readFileSync('./keys/private.key', 'utf-8');
 const NoirBignum = require('@mach-34/noir-bignum-paramgen');
 const MAX_JWT_SIZE = 1536;
 
@@ -96,7 +95,9 @@ async function generateNoirInputs(payload, keypair) {
     const { data, signature } = await generateJWSSignature(payload, keypair.privateKey);
     const pubkey = await pubkeyFromKeypair(keypair);
     return {
-        data,
+        // data,
+        data: data.storage,
+        data_len: data.len,
         pubkey_modulus_limbs: pubkey.modulus,
         redc_params_limbs: pubkey.redc,
         signature_limbs: signature,
@@ -121,6 +122,7 @@ async function main() {
 
     const key = await newRSAKey();
     const inputs = await generateNoirInputs(paymentPayload, key);
+    console.log()
     const { witness, returnValue } = await execute(inputs)
 }
 
