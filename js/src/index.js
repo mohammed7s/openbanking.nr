@@ -11,7 +11,7 @@ const MAX_JWT_SIZE = 1536;
  * @param {*} payload 
  * @returns 
  */
-async function generateJWSSignature(payload, privateKey) {
+async function generateJWSSignature(payload, privateKey, publicKey) {
     try {
         // Base64URL encode header and payload
         const base64Data = (typeof payload === 'string' && isBase64(payload))
@@ -22,12 +22,16 @@ async function generateJWSSignature(payload, privateKey) {
         const encoder = new TextEncoder();
         const dataBuffer = encoder.encode(base64Data);
 
+        const hashBuffer = await crypto.subtle.digest('SHA-256', dataBuffer);
+
+        // If you need it as Uint8Array:
+        const hashArray = new Uint8Array(hashBuffer);
+        console.log("Hash", hashArray);
 
         // Sign the data
         const signature = await crypto.subtle.sign(
             {
                 name: "RSASSA-PKCS1-v1_5",
-                saltLength: 32,
             },
             privateKey,
             dataBuffer
@@ -88,11 +92,11 @@ function toBoundedVec(data, maxLength) {
     data = Array.from(data);
     const storage = data.concat(Array(length - data.length).fill(0)).map(byte => byte.toString());
     return { storage, len: data.length.toString() }
-
 }
 
 async function generateNoirInputs(payload, keypair) {
-    const { data, signature } = await generateJWSSignature(payload, keypair.privateKey);
+    const { data, signature } = await generateJWSSignature(payload, keypair.privateKey, keypair.publicKey);
+
     const pubkey = await pubkeyFromKeypair(keypair);
     return {
         // data,
@@ -105,6 +109,30 @@ async function generateNoirInputs(payload, keypair) {
         // full_data_length: data.len,
         // is_partial_hash: "0"
     }
+}
+
+function toProverToml(inputs) {
+    const lines = [];
+    const structs = [];
+    for (const [key, value] of Object.entries(inputs)) {
+        if (Array.isArray(value)) {
+            const valueStrArr = value.map((val) => `'${val}'`);
+            lines.push(`${key} = [${valueStrArr.join(", ")}]`);
+        } else if (typeof value === "string") {
+            lines.push(`${key} = '${value}'`);
+        } else {
+            let values = "";
+            for (const [k, v] of Object.entries(value)) {
+                if (Array.isArray(v)) {
+                    values = values.concat(`${k} = [${v.map((val) => `'${val}'`).join(", ")}]\n`);
+                } else {
+                    values = values.concat(`${k} = '${v}'\n`);
+                }
+            }
+            structs.push(`[${key}]\n${values}`);
+        }
+    }
+    return lines.concat(structs).join("\n");
 }
 
 async function execute(inputs) {
@@ -122,8 +150,8 @@ async function main() {
 
     const key = await newRSAKey();
     const inputs = await generateNoirInputs(paymentPayload, key);
-    console.log()
-    const { witness, returnValue } = await execute(inputs)
+    console.log(toProverToml(inputs))
+    // const { witness, returnValue } = await execute(inputs)
 }
 
 main()
