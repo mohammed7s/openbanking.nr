@@ -26,7 +26,7 @@ async function generateJWSSignature(payload, privateKey) {
         // Sign the data
         const signature = await crypto.subtle.sign(
             {
-                name: "RSA-PSS",
+                name: "RSASSA-PKCS1-v1_5",
                 saltLength: 32,
             },
             privateKey,
@@ -45,7 +45,7 @@ async function generateJWSSignature(payload, privateKey) {
 async function newRSAKey() {
     return await crypto.subtle.generateKey(
         {
-            name: "RSA-PSS",
+            name: "RSASSA-PKCS1-v1_5",
             modulusLength: 2048,
             publicExponent: new Uint8Array([0x01, 0x00, 0x01]), // 65537
             hash: "SHA-256",
