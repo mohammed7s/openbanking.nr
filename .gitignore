@@ -1,4 +1,5 @@
 target
 node_modules
 .env
-
+noir_string_search
+noir-jwt

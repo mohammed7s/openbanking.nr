@@ -12,49 +12,71 @@ const MAX_JWT_SIZE = 1536;
  * @param {*} payload 
  * @returns 
  */
-function generateJWSSignature(payload) {
+async function generateJWSSignature(payload, privateKey) {
     try {
-        const header = {
-            alg: "RS256",
-            kid: "2kiXQyo0tedjW2somjSgH7",
-            crit: ["http://openbanking.org.uk/tan"],
-            "http://openbanking.org.uk/tan": process.env.JWKS_ROOT_DOMAIN
-        };
         // Base64URL encode header and payload
+        const base64Data = (typeof payload === 'string' && isBase64(payload))
+            ? data
+            : Buffer.from(JSON.stringify(payload)).toString('base64');
 
-        const encodedPayload = Buffer.from(JSON.stringify(payload))
-            .toString('base64')
-            .replace(/\+/g, '-')
-            .replace(/\//g, '_')
-            .replace(/=/g, '');
+        // Convert base64 to ArrayBuffer for signing
+        const encoder = new TextEncoder();
+        const dataBuffer = encoder.encode(base64Data);
 
-        // Read private key
 
-        // Create signature using PS256 (SHA-256 with PSS padding)
-        const signature = BigInt(`0x${crypto.sign(
-            'sha256',
-            Buffer.from(encodedPayload, 'utf-8'),
-            { key: privateKeyPEM }
-        ).toString('hex')}`);
+        // Sign the data
+        const signature = await crypto.subtle.sign(
+            {
+                name: "RSA-PSS",
+                saltLength: 32,
+            },
+            privateKey,
+            dataBuffer
+        );
 
         // Return complete JWS
-        return { data: toBoundedVec(encodedPayload), signature: NoirBignum.bnToLimbStrArray(signature) };
+        let sig = BigInt(`0x${Buffer.from(signature).toString('hex')}`);
+        return { data: toBoundedVec(Buffer.from(dataBuffer)), signature: NoirBignum.bnToLimbStrArray(sig) };
     } catch (error) {
         console.error('Error generating JWS signature:', error);
         throw error;
     }
 }
 
-function pubkeyFromCert() {
-    const privateKey = crypto.createPrivateKey(privateKeyPEM);
-    const publicKey = crypto.createPublicKey(privateKey);
-    const publicKeyDer = publicKey.export({ type: 'spki', format: 'der' });
-    const pubkeyBigint = BigInt(`0x${publicKeyDer.toString('hex')}`);
-    console.log("p", pubkeyBigint.toString(2).length);
+async function newRSAKey() {
+    return await crypto.subtle.generateKey(
+        {
+            name: "RSA-PSS",
+            modulusLength: 2048,
+            publicExponent: new Uint8Array([0x01, 0x00, 0x01]), // 65537
+            hash: "SHA-256",
+        },
+        true, // extractable
+        ["sign", "verify"]
+    );
+}
+
+async function pubkeyFromKeypair(keyPair) {
+    const pubkey = await crypto.subtle.exportKey("jwk", keyPair.publicKey)
+    const modulus = bytesToBigInt(base64UrlToBytes(pubkey.n));
     return {
-        modulus: NoirBignum.bnToLimbStrArray(pubkeyBigint).slice(0, 18),
-        redc: NoirBignum.bnToRedcLimbStrArray(pubkeyBigint).slice(0, 18)
+        modulus: NoirBignum.bnToLimbStrArray(modulus),
+        redc: NoirBignum.bnToRedcLimbStrArray(modulus)
     }
+}
+
+function base64UrlToBytes(base64Url) {
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const padding = '='.repeat((4 - base64.length % 4) % 4);
+    const base64Padded = base64 + padding;
+    return Uint8Array.from(atob(base64Padded), c => c.charCodeAt(0));
+}
+
+function bytesToBigInt(bytes) {
+    let hex = Array.from(bytes)
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+    return BigInt('0x' + hex);
 }
 
 function toBoundedVec(data, maxLength) {
@@ -64,25 +86,23 @@ function toBoundedVec(data, maxLength) {
     if (data.length > length) {
         throw new Error(`Data exceeds maximum length of ${length} bytes`);
     }
-    data = Array.from(Buffer.from(data, 'utf-8'));
+    data = Array.from(data);
     const storage = data.concat(Array(length - data.length).fill(0)).map(byte => byte.toString());
-    return { storage, len: data.length.toString()}
-    
+    return { storage, len: data.length.toString() }
+
 }
 
-function generateNoirInputs(payload) {
-    const { data, signature } = generateJWSSignature(paymentPayload);
-    const pubkey = pubkeyFromCert();
-    const base64Offset = "0";
+async function generateNoirInputs(payload, keypair) {
+    const { data, signature } = await generateJWSSignature(payload, keypair.privateKey);
+    const pubkey = await pubkeyFromKeypair(keypair);
     return {
         data,
-        b64_offset: base64Offset,
         pubkey_modulus_limbs: pubkey.modulus,
         redc_params_limbs: pubkey.redc,
         signature_limbs: signature,
-        partial_hash: ["0", "0", "0", "0", "0", "0", "0", "0"],
-        full_data_length: data.len,
-        is_partial_hash: "0"
+        // // partial_hash: ["0", "0", "0", "0", "0", "0", "0", "0"],
+        // full_data_length: data.len,
+        // is_partial_hash: "0"
     }
 }
 
@@ -94,10 +114,14 @@ async function execute(inputs) {
 // console.log(generateJWSSignature(paymentPayload));
 
 async function main() {
-    const inputs = generateNoirInputs(paymentPayload);
-    const { witness, returnValue } = await execute({ jwt: inputs });
-    console.log("inp len", inputs.redc_params_limbs.length)
-    console.log("success :)")
+    // const inputs = generateNoirInputs(paymentPayload);
+    // const { witness, returnValue } = await execute({ jwt: inputs });
+    // console.log("inp len", inputs.redc_params_limbs.length)
+    // console.log("success :)")
+
+    const key = await newRSAKey();
+    const inputs = await generateNoirInputs(paymentPayload, key);
+    const { witness, returnValue } = await execute(inputs)
 }
 
 main()
