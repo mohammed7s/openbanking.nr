@@ -18,10 +18,10 @@ Thank you for donating and supporting the project!
 
 ### Technical components 
 
-[ ] Integrate PS256 signatures   
-[ ] Test signature verification with OB data  
-[ ] Certificate chain verification to OB root CA   
-[ ] Example Escrow contract on Aztec network   
+- [ ] Integrate PS256 signatures   
+- [ ] Test signature verification with OB data  
+- [ ] Certificate chain verification to OB root CA   
+- [ ] Example Escrow contract on Aztec network   
 
 ### Payment types implementation v3.1.2
 
