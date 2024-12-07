@@ -3,6 +3,7 @@
 Payments in the openbanking standard are signed by the bank using JWS/JWT formats. A proof of computation over the private payment data can prove to a smart contract verifier that an offchain bank-bank payment without revealing unnecessary private data. 
 
 
+
 ## Table of Contents
 - [Overview](#Overview)
 - [Background: The Open Banking Standard](#Background-The-open-Banking-Standard)
@@ -67,7 +68,7 @@ full version can be found on: https://openbanking.atlassian.net/wiki/spaces/DZ/p
 
 The user initiates payment through the PISP 
 The payment confirmation occurs between a PISP and bank. 
-The payment is signed using JWS which can be (p256, RSA or EC) 
+The payment is signed as a JWS using PS256.  
 
 Response Format Example: 
 ```
@@ -165,7 +166,7 @@ Refer to the [Open Banking Directory 2.0 Technical Overview](https://openbanking
 check details on message signing within openbanking here:
 https://openbanking.atlassian.net/wiki/spaces/DZ/pages/1077805207/Read+Write+Data+API+Specification+-+v3.1.2#Read/WriteDataAPISpecification-v3.1.2-MessageSigning.1
 
-It seems the PS256 is required. Although in earlier versions it seems to have been more open based on v2.0 https://openbanking.atlassian.net/wiki/spaces/DZ/pages/127009221/Read+Write+Data+API+Specification+v2.0.0#Read/WriteDataAPISpecification-v2.0.0-MessageSigning.1
+It seems the PS256 is required in v3.1.2 Although in earlier versions it seems to have been more open based on v2.0 docs. https://openbanking.atlassian.net/wiki/spaces/DZ/pages/127009221/Read+Write+Data+API+Specification+v2.0.0#Read/WriteDataAPISpecification-v2.0.0-MessageSigning.1
 
 
 JSON Web Signatures (JWS) are used within the OAuth 2.0 framework, as described in [RFC 7515](https://datatracker.ietf.org/doc/html/rfc7515) Refer to [RFC 7518 Section 3.1](https://datatracker.ietf.org/doc/html/rfc7518#section-3.1) for supported algorithms in the wider JWS standard. 
@@ -226,18 +227,10 @@ The scope of the library can be extended beyond payments and into account inform
 - In this set up where we are counting on the TPP to provide the signed data, there is a liveness assumption on the TPP. The PISP can withhold the transaction details (the payload) needed to prove onchain a smart contract. However the PISP cannot steal funds. 
 - Is the certificate authority fully public?without any constraints on who accesses it? Are there legal issues with putting those bank public keys onchain?
 
- 
- 
 
 ## Future directions
 
 - TLS proofs: Account and transaction history flows between the AISP and the bank are not signed. Otherwise obtaining history would be a more convenient way to prove a payment rather than doing it one by one with the payment signatures approach. However, it could be interesting to use a tls notary to perhaps prove those communications.  
-
-
-
-## License
-
-OpenBanking.nr is released under the MIT License. See [LICENSE](LICENSE) for the full license text.
 
 
 
